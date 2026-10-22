@@ -7,6 +7,15 @@ terraform {
       version = "~> 6.0"
     }
   }
+
+  # Added after the first apply, once the bucket existed. The bucket is created by this same configuration.
+  backend "s3" {
+    bucket       = "boctrust-terraform-state-852922980278"
+    key          = "bootstrap/terraform.tfstate"
+    region       = "eu-west-1"
+    encrypt      = true
+    use_lockfile = true
+  }
 }
 
 provider "aws" {
