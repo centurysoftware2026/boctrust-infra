@@ -93,23 +93,10 @@ There is no domain yet, so everything uses the `*.cloudfront.net` name:
 
 ## Prerequisites
 
-- Terraform `>= 1.10` (the planned state backend uses S3 native locking)
+- Terraform `>= 1.10` (the state backend uses S3 native locking)
 - AWS CLI v2
 - Access to account `852922980278` through IAM Identity Center
 - Git access to the `centurysoftware2026` GitHub organisation
-
-### AWS access
-
-Use a dedicated named profile so it cannot be mixed up with any other account:
-
-```bash
-aws configure sso            # session name: boctrust, SSO region: eu-west-1, profile name: boctrust
-aws sso login --profile boctrust
-export AWS_PROFILE=boctrust
-aws sts get-caller-identity  # Account must be 852922980278
-```
-
-**Always check the `Account` value before running `terraform apply`.**
 
 ## Terraform workflow
 
@@ -205,20 +192,3 @@ terraform apply tfplan           # apply exactly the reviewed plan
 - **Naming:** resources use hyphens, and no em dashes in names or descriptions.
 - **Tags:** every resource carries `Project=boctrust`, `Environment`, and `ManagedBy=terraform`.
 - **Changes to the database or the IAM roles** need a second reviewer.
-
-## Open decisions
-
-These are listed in section 09 of the architecture PDF and affect the code:
-
-- Staging and production together, or phased
-- Domain name and DNS provider (needed for certificates, HTTPS to the ALB and per-service hostnames)
-- Current database location and size (decides how data is moved into RDS)
-- Whether the mobile app can use one hostname per service (until then it uses the `/api/<service>/` paths)
-- Terraform or CDK (this repo assumes Terraform)
-
-## Before go-live
-
-- Rotate the test account and remove `test-user-credentials.txt` from `boctrust-backend`
-- Remove static AWS keys from the backend config and rely on task roles
-- Block `/internal/*`, Swagger and `/health/metrics` at the edge
-- Lock ALB ingress to CloudFront
