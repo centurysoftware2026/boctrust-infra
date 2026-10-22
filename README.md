@@ -61,7 +61,7 @@ boctrust-infra/
 │   ├── staging/          # Thin root: backend, provider, settings
 │   └── prod/
 ├── docs/
-└── .github/workflows/    # Plan on pull request, apply on merge (production needs approval)
+└── .github/workflows/    # Plan on pull request, apply staging on merge, apply production by hand
 ```
 
 Staging and production differ only by the settings passed to `modules/environment`.
@@ -115,7 +115,7 @@ flowchart TD
     H --> I["CI: apply staging"]
     I --> J{Staging healthy?}
     J -- No --> K[Fix forward or revert the merge]
-    J -- Yes --> L[Manual approval gate]
+    J -- Yes --> L["Run the workflow by hand on main"]
     L --> M["CI: apply prod"]
 ```
 
@@ -170,6 +170,10 @@ The state bucket cannot hold the state that creates it, so setup has stages.
    The dashboard release uses `admin_deploy_role_arn` the same way (workflow not written yet).
 
 6. **Production**: repeat steps 2 to 5 from `envs/prod` after staging is verified.
+
+Production is applied by hand for now: Actions, then terraform, then Run workflow, on `main`. This is because the
+`production` GitHub environment has no required reviewers yet. Once a repo admin adds them, the `apply-prod` job in
+`.github/workflows/terraform.yml` can go back to running after staging, behind that approval.
 
 GitHub setup needed once: create the `staging` and `production` environments in this repo and in the backend and admin repos, and add required reviewers to `production`. The deploy roles trust the environment name, so a job outside that environment cannot assume them.
 

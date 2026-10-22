@@ -6,6 +6,8 @@ on:
   push:
     branches: [main]
     paths: ["modules/**", "envs/**", ".github/workflows/terraform.yml"]
+  # Production is applied by hand: Actions > terraform > Run workflow, on main.
+  workflow_dispatch:
 
 permissions:
   id-token: write
@@ -34,7 +36,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        env: [staging, prod]
+        # A manual run plans production only. Pushes and pull requests plan both.
+        env: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '["prod"]' || '["staging","prod"]') }}
     defaults:
       run:
         working-directory: envs/${{ matrix.env }}
@@ -65,15 +68,16 @@ jobs:
             const body = `### Terraform plan: ${{ matrix.env }}\n<details><summary>Show plan</summary>\n\n\`\`\`\n${plan.length > max ? plan.slice(0, max) + '\n... truncated' : plan}\n\`\`\`\n</details>`;
             await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
       - name: Keep the plan for apply
-        if: github.event_name == 'push'
+        if: (github.event_name == 'push' && matrix.env == 'staging') || (github.event_name == 'workflow_dispatch' && matrix.env == 'prod')
         uses: actions/upload-artifact@v4
         with:
           name: tfplan-${{ matrix.env }}
           path: envs/${{ matrix.env }}/tfplan
           retention-days: 1
 
-  # The plan above is applied as-is, so what was planned after merge is what runs.
-  # Production waits for approval in the "production" GitHub environment.
+  # The plan above is applied as-is, so what was planned is what runs.
+  # Staging applies after every merge. Production applies only from a manual run on main.
+  # Once the "production" GitHub environment has required reviewers, this can go back to running after staging.
   apply-staging:
     if: github.event_name == 'push'
     needs: plan
@@ -100,8 +104,8 @@ jobs:
       - run: terraform apply -input=false -lock-timeout=5m tfplan
 
   apply-prod:
-    if: github.event_name == 'push'
-    needs: [plan, apply-staging]
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: plan
     runs-on: ubuntu-latest
     environment: production
     defaults:
