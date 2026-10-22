@@ -8,6 +8,12 @@ variable "github_org" {
   default = "centurysoftware2026"
 }
 
+variable "github_org_id" {
+  description = "Numeric ID of the GitHub organisation. This org's OIDC subjects look like repo:<org>@<org id>/<repo>@<repo id>:..."
+  type        = string
+  default     = "312579764"
+}
+
 variable "oidc_provider_arn" {
   type = string
 }

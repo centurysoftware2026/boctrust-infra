@@ -22,9 +22,9 @@ data "aws_iam_policy_document" "backend_trust" {
     }
 
     condition {
-      test     = "StringEquals"
+      test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_org}/${var.backend_repo}:environment:${var.github_environment}"]
+      values   = ["repo:${var.github_org}@${var.github_org_id}/${var.backend_repo}@*:environment:${var.github_environment}"]
     }
   }
 }
@@ -119,9 +119,9 @@ data "aws_iam_policy_document" "admin_trust" {
     }
 
     condition {
-      test     = "StringEquals"
+      test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_org}/${var.admin_repo}:environment:${var.github_environment}"]
+      values   = ["repo:${var.github_org}@${var.github_org_id}/${var.admin_repo}@*:environment:${var.github_environment}"]
     }
   }
 }

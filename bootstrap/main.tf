@@ -87,6 +87,11 @@ module "baseline" {
   budget_email = var.budget_email
 }
 
+locals {
+  # Subject prefix in this org's OIDC tokens (ID-based format).
+  infra_sub = "repo:${var.github_org}@${var.github_org_id}/${var.infra_repo}@${var.infra_repo_id}"
+}
+
 # Terraform CI roles. Plan runs on pull requests with read access; apply runs only from main
 # and only inside a protected GitHub environment, so production needs a manual approval.
 data "aws_iam_policy_document" "plan_trust" {
@@ -107,7 +112,7 @@ data "aws_iam_policy_document" "plan_trust" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_org}/${var.infra_repo}:pull_request", "repo:${var.github_org}/${var.infra_repo}:ref:refs/heads/*"]
+      values   = ["${local.infra_sub}:pull_request", "${local.infra_sub}:ref:refs/heads/*"]
     }
   }
 }
@@ -155,8 +160,8 @@ data "aws_iam_policy_document" "apply_trust" {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
-        "repo:${var.github_org}/${var.infra_repo}:environment:staging",
-        "repo:${var.github_org}/${var.infra_repo}:environment:production",
+        "${local.infra_sub}:environment:staging",
+        "${local.infra_sub}:environment:production",
       ]
     }
   }

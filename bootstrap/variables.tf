@@ -22,6 +22,18 @@ variable "github_org" {
   default     = "centurysoftware2026"
 }
 
+variable "github_org_id" {
+  description = "Numeric ID of the GitHub organisation. This org's OIDC tokens use the ID-based subject format repo:<org>@<org id>/<repo>@<repo id>:..."
+  type        = string
+  default     = "312579764"
+}
+
+variable "infra_repo_id" {
+  description = "Numeric ID of the infra repository, used in the OIDC subject."
+  type        = string
+  default     = "1428939288"
+}
+
 variable "infra_repo" {
   description = "Repository allowed to plan and apply this Terraform from CI."
   type        = string
