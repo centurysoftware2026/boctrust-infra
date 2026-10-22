@@ -1,0 +1,2 @@
+# Copy to terraform.tfvars (git-ignored). Raise after the first images are pushed.
+service_desired_count = 0
