@@ -1,0 +1,129 @@
+name: terraform
+
+on:
+  pull_request:
+    paths: ["bootstrap/**", "modules/**", "envs/**", ".github/workflows/terraform.yml"]
+  push:
+    branches: [main]
+    paths: ["modules/**", "envs/**", ".github/workflows/terraform.yml"]
+  # Production is applied by hand: Actions > terraform > Run workflow, on main.
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  TF_IN_AUTOMATION: "true"
+  AWS_REGION: eu-west-1
+  PLAN_ROLE: arn:aws:iam::852922980278:role/boctrust-terraform-plan
+  APPLY_ROLE: arn:aws:iam::852922980278:role/boctrust-terraform-apply
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.10"
+      - run: terraform fmt -check -recursive
+
+  plan:
+    needs: fmt
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # A manual run plans production only. Pushes and pull requests plan both.
+        env: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '["prod"]' || '["staging","prod"]') }}
+    defaults:
+      run:
+        working-directory: envs/${{ matrix.env }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.10"
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.PLAN_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+      - run: terraform init -input=false
+      - run: terraform validate
+      - run: terraform plan -input=false -lock-timeout=5m -out=tfplan
+      - name: Render plan
+        if: github.event_name == 'pull_request'
+        run: terraform show -no-color tfplan > plan.txt
+      - name: Comment plan on the pull request
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('envs/${{ matrix.env }}/plan.txt', 'utf8');
+            const max = 60000;
+            const body = `### Terraform plan: ${{ matrix.env }}\n<details><summary>Show plan</summary>\n\n\`\`\`\n${plan.length > max ? plan.slice(0, max) + '\n... truncated' : plan}\n\`\`\`\n</details>`;
+            await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
+      - name: Keep the plan for apply
+        if: (github.event_name == 'push' && matrix.env == 'staging') || (github.event_name == 'workflow_dispatch' && matrix.env == 'prod')
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ matrix.env }}
+          path: envs/${{ matrix.env }}/tfplan
+          retention-days: 1
+
+  # The plan above is applied as-is, so what was planned is what runs.
+  # Staging applies after every merge. Production applies only from a manual run on main.
+  # Once the "production" GitHub environment has required reviewers, this can go back to running after staging.
+  apply-staging:
+    if: github.event_name == 'push'
+    needs: plan
+    runs-on: ubuntu-latest
+    environment: staging
+    defaults:
+      run:
+        working-directory: envs/staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.10"
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.APPLY_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: tfplan-staging
+          path: envs/staging
+      - run: terraform init -input=false
+      - run: terraform apply -input=false -lock-timeout=5m tfplan
+
+  apply-prod:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: plan
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: envs/prod
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.10"
+          terraform_wrapper: false
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.APPLY_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: tfplan-prod
+          path: envs/prod
+      - run: terraform init -input=false
+      - run: terraform apply -input=false -lock-timeout=5m tfplan
