@@ -142,7 +142,9 @@ module "service" {
   vpc_id             = module.network.vpc_id
   private_subnet_ids = module.network.private_subnet_ids
   namespace_id       = module.cluster.namespace_id
-  log_group_name     = module.cluster.log_group_names[each.key]
+
+  enable_service_discovery = true
+  log_group_name           = module.cluster.log_group_names[each.key]
 
   image                 = "${module.cluster.repository_urls[each.key]}:${var.image_tag}"
   container_port        = each.value.port

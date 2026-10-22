@@ -64,9 +64,15 @@ variable "log_group_name" {
 }
 
 variable "namespace_id" {
-  description = "Cloud Map namespace for service discovery. Null disables it."
+  description = "Cloud Map namespace for service discovery. Only used when enable_service_discovery is true."
   type        = string
   default     = null
+}
+
+variable "enable_service_discovery" {
+  description = "Register the service in Cloud Map. A separate flag, because namespace_id is unknown until apply and cannot drive count."
+  type        = bool
+  default     = false
 }
 
 variable "alb" {

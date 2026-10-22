@@ -125,7 +125,7 @@ resource "aws_ecs_task_definition" "this" {
 }
 
 resource "aws_service_discovery_service" "this" {
-  count = var.namespace_id == null ? 0 : 1
+  count = var.enable_service_discovery ? 1 : 0
 
   name = var.name
 
@@ -213,7 +213,7 @@ resource "aws_ecs_service" "this" {
   }
 
   dynamic "service_registries" {
-    for_each = var.namespace_id == null ? [] : [1]
+    for_each = var.enable_service_discovery ? [1] : []
 
     content {
       registry_arn = aws_service_discovery_service.this[0].arn
